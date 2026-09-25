@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens           RefreshToken[]
+
+  profile                 Profile?
+  posts                   Post[]
+  comments                Comment[]
+  likes                   Like[]
+  userSkills              UserSkill[]
+  followers               Follow[]    @relation("Following")
+  following               Follow[]    @relation("Followers")
+  collaborationPreference CollaborationPreference?
+  profileAnalyses         ProfileAnalysis[]
+  sentRequests            CollaborationRequest[] @relation("SentRequests")
+  receivedRequests        CollaborationRequest[] @relation("ReceivedRequests")
+
+  @@index([name])
+}
+
+model Profile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  bio            String?
+  profilePicture String?
+  location       String?
+  education      String?
+  experience     String?
+  targetRole     String?
+  githubUsername String?
+  linkedinUrl    String?
+  portfolioUrl   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([targetRole])
+}
+
+model Skill {
+  id         String      @id @default(uuid())
+  name       String      @unique
+  createdAt  DateTime    @default(now())
+  userSkills UserSkill[]
+}
+
+model UserSkill {
+  id        String   @id @default(uuid())
+  userId    String
+  skillId   String
+  user      User     @relation(fields: [userId], references: [id])
+  skill     Skill    @relation(fields: [skillId], references: [id])
+  level     String? // e.g., Beginner, Intermediate, Expert
+  createdAt DateTime @default(now())
+
+  @@unique([userId, skillId])
+}
+
+model Post {
+  id        String    @id @default(uuid())
+  content   String
+  imageUrl  String?
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id])
+  comments  Comment[]
+  likes     Like[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id              String    @id @default(uuid())
+  content         String
+  postId          String
+  authorId        String
+  parentCommentId String?
+  post            Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author          User      @relation(fields: [authorId], references: [id])
+  parent          Comment?  @relation("CommentToComment", fields: [parentCommentId], references: [id])
+  replies         Comment[] @relation("CommentToComment")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([postId])
+  @@index([authorId])
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([postId, authorId])
+  @@index([postId])
+  @@index([authorId])
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  follower    User     @relation("Followers", fields: [followerId], references: [id])
+  following   User     @relation("Following", fields: [followingId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model ProfileAnalysis {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetRole     String
+  inputSnapshot  Json
+  analysisResult Json
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+}
+
+model CollaborationPreference {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lookingForSkills   String[] 
+  preferredTechs     String[]
+  projectInterests   String[]
+  collaborationGoals String[]
+  preferredTeamRoles String[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model CollaborationRequest {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  sender     User     @relation("SentRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revoked     Boolean  @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+}
